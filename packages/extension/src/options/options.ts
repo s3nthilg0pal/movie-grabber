@@ -11,6 +11,11 @@ const fields: (keyof ExtensionSettings)[] = [
   'radarrApiKey',
   'sonarrUrl',
   'sonarrApiKey',
+  'qbitUrl',
+  'qbitUsername',
+  'qbitPassword',
+  'qbitMovieCategory',
+  'qbitTvCategory',
 ];
 
 function showStatus(message: string, isError = false) {
@@ -60,6 +65,11 @@ async function saveSettings() {
     radarrApiKey: $<HTMLInputElement>('radarrApiKey').value,
     sonarrUrl: $<HTMLInputElement>('sonarrUrl').value.replace(/\/+$/, ''),
     sonarrApiKey: $<HTMLInputElement>('sonarrApiKey').value,
+    qbitUrl: $<HTMLInputElement>('qbitUrl').value.replace(/\/+$/, ''),
+    qbitUsername: $<HTMLInputElement>('qbitUsername').value,
+    qbitPassword: $<HTMLInputElement>('qbitPassword').value,
+    qbitMovieCategory: $<HTMLInputElement>('qbitMovieCategory').value || 'radarr',
+    qbitTvCategory: $<HTMLInputElement>('qbitTvCategory').value || 'sonarr',
   };
 
   const radarrProfile = $<HTMLSelectElement>('radarrQualityProfile').value;

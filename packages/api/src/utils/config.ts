@@ -1,5 +1,5 @@
 import type { FastifyRequest } from 'fastify';
-import type { ArrConfig } from '@movie-grabber/shared';
+import type { ArrConfig, QBittorrentConfig } from '@movie-grabber/shared';
 
 /**
  * Extract *arr configuration from request headers.
@@ -38,5 +38,21 @@ export function extractSonarrConfig(req: FastifyRequest): ArrConfig {
     apiKey,
     qualityProfileId: qualityProfileId ? parseInt(qualityProfileId, 10) : undefined,
     rootFolderPath,
+  };
+}
+
+export function extractQBitConfig(req: FastifyRequest): QBittorrentConfig {
+  const url = req.headers['x-qbit-url'] as string | undefined;
+  const username = req.headers['x-qbit-username'] as string | undefined;
+  const password = req.headers['x-qbit-password'] as string | undefined;
+
+  if (!url) {
+    throw new Error('Missing qBittorrent configuration. Provide X-Qbit-Url header.');
+  }
+
+  return {
+    url: url.replace(/\/+$/, ''),
+    username: username || 'admin',
+    password: password || '',
   };
 }

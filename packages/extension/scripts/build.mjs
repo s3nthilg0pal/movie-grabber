@@ -4,7 +4,7 @@
  */
 import { execSync } from 'child_process';
 
-const entries = ['content-imdb', 'content-rottentomatoes', 'service-worker', 'options'];
+const entries = ['content-imdb', 'content-rottentomatoes', 'content-magnet', 'service-worker', 'options'];
 
 for (const entry of entries) {
   console.log(`\n📦 Building ${entry}...`);

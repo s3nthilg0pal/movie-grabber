@@ -5,7 +5,8 @@
   "description": "Grab movies and TV series from IMDb & Rotten Tomatoes, add them to Radarr/Sonarr",
   "permissions": [
     "activeTab",
-    "storage"
+    "storage",
+    "scripting"
   ],
   "host_permissions": [
     "http://*/",
@@ -43,6 +44,6 @@
       "16": "icons/icon16.png",
       "48": "icons/icon48.png"
     },
-    "default_title": "Movie Grabber"
+    "default_title": "Scan for magnet links"
   }
 }

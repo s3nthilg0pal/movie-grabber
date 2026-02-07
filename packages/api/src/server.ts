@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import { movieRoutes } from './routes/movie.js';
 import { seriesRoutes } from './routes/series.js';
 import { configRoutes } from './routes/config.js';
+import { magnetRoutes } from './routes/magnet.js';
 
 const fastify = Fastify({
   logger: {
@@ -26,6 +27,7 @@ fastify.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOS
 await fastify.register(movieRoutes, { prefix: '/api/movie' });
 await fastify.register(seriesRoutes, { prefix: '/api/series' });
 await fastify.register(configRoutes, { prefix: '/api/config' });
+await fastify.register(magnetRoutes, { prefix: '/api/magnet' });
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 const PORT = parseInt(process.env.PORT ?? '3000', 10);

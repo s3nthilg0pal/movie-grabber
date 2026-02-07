@@ -4,6 +4,7 @@ import type {
   ExtensionSettings,
   MediaInfo,
   ApiResponse,
+  AddMagnetMessage,
 } from '@movie-grabber/shared';
 import { DEFAULT_SETTINGS } from '@movie-grabber/shared';
 
@@ -37,6 +38,11 @@ function buildHeaders(settings: ExtensionSettings): Record<string, string> {
     headers['X-Sonarr-Quality-Profile'] = String(settings.sonarrQualityProfileId);
   }
   if (settings.sonarrRootFolderPath) headers['X-Sonarr-Root-Folder'] = settings.sonarrRootFolderPath;
+
+  // qBittorrent config
+  if (settings.qbitUrl) headers['X-Qbit-Url'] = settings.qbitUrl;
+  if (settings.qbitUsername) headers['X-Qbit-Username'] = settings.qbitUsername;
+  if (settings.qbitPassword) headers['X-Qbit-Password'] = settings.qbitPassword;
 
   return headers;
 }
@@ -99,6 +105,54 @@ async function checkStatus(media: MediaInfo): Promise<ExtensionResponse> {
   };
 }
 
+async function addMagnetLink(msg: AddMagnetMessage): Promise<ExtensionResponse> {
+  const settings = await getSettings();
+
+  if (!settings.backendUrl) {
+    return { success: false, message: 'Backend URL not configured. Open extension options.' };
+  }
+
+  if (!settings.qbitUrl) {
+    return { success: false, message: 'qBittorrent URL not configured. Open extension options.' };
+  }
+
+  const category = msg.type === 'movie'
+    ? (settings.qbitMovieCategory || 'radarr')
+    : (settings.qbitTvCategory || 'sonarr');
+
+  const res = await fetch(`${settings.backendUrl}/api/magnet/add`, {
+    method: 'POST',
+    headers: buildHeaders(settings),
+    body: JSON.stringify({
+      magnetUri: msg.magnetUri,
+      title: msg.title,
+      type: msg.type,
+      category,
+    }),
+  });
+
+  const data: ApiResponse = await res.json();
+
+  return {
+    success: data.success,
+    message: data.message,
+  };
+}
+
+// ─── Extension icon click — inject magnet scanner ────────────────────────────
+chrome.action.onClicked.addListener(async (tab) => {
+  if (!tab.id) return;
+
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['content-magnet.js'],
+    });
+  } catch (err) {
+    console.error('[Movie Grabber] Failed to inject magnet scanner:', err);
+  }
+});
+
 // ─── Message listener ────────────────────────────────────────────────────────
 chrome.runtime.onMessage.addListener(
   (message: ExtensionMessage, _sender, sendResponse: (r: ExtensionResponse) => void) => {
@@ -109,6 +163,8 @@ chrome.runtime.onMessage.addListener(
             return await addMedia(message.media);
           case 'checkStatus':
             return await checkStatus(message.media);
+          case 'addMagnet':
+            return await addMagnetLink(message);
           default:
             return { success: false, message: 'Unknown action' };
         }

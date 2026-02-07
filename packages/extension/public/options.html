@@ -224,6 +224,35 @@
     <button class="btn-test" id="testSonarr">Test & Load Profiles</button>
   </div>
 
+  <!-- qBittorrent -->
+  <div class="section">
+    <h2>🧲 qBittorrent (Magnet Downloads)</h2>
+    <div class="field">
+      <label for="qbitUrl">qBittorrent Web UI URL</label>
+      <input type="url" id="qbitUrl" placeholder="http://localhost:8080">
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="qbitUsername">Username</label>
+        <input type="text" id="qbitUsername" placeholder="admin">
+      </div>
+      <div class="field">
+        <label for="qbitPassword">Password</label>
+        <input type="password" id="qbitPassword" placeholder="Your qBittorrent password">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="qbitMovieCategory">Movie Category</label>
+        <input type="text" id="qbitMovieCategory" placeholder="radarr">
+      </div>
+      <div class="field">
+        <label for="qbitTvCategory">TV Series Category</label>
+        <input type="text" id="qbitTvCategory" placeholder="sonarr">
+      </div>
+    </div>
+  </div>
+
   <div class="actions">
     <button class="btn-primary" id="save">Save Settings</button>
     <button class="btn-secondary" id="reset">Reset to Defaults</button>

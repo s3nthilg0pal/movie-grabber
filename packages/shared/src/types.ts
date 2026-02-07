@@ -2,7 +2,7 @@
 
 export type MediaType = 'movie' | 'series';
 
-export type MediaSource = 'imdb' | 'rottentomatoes';
+export type MediaSource = 'imdb' | 'rottentomatoes' | 'magnet';
 
 export interface MediaInfo {
   type: MediaType;
@@ -25,7 +25,14 @@ export interface CheckStatusMessage {
   media: MediaInfo;
 }
 
-export type ExtensionMessage = AddMediaMessage | CheckStatusMessage;
+export interface AddMagnetMessage {
+  action: 'addMagnet';
+  magnetUri: string;
+  title: string;
+  type: MediaType;
+}
+
+export type ExtensionMessage = AddMediaMessage | CheckStatusMessage | AddMagnetMessage;
 
 export interface ExtensionResponse {
   success: boolean;
@@ -45,6 +52,11 @@ export interface ExtensionSettings {
   sonarrQualityProfileId?: number;
   radarrRootFolderPath?: string;
   sonarrRootFolderPath?: string;
+  qbitUrl: string;
+  qbitUsername: string;
+  qbitPassword: string;
+  qbitMovieCategory: string;
+  qbitTvCategory: string;
 }
 
 export const DEFAULT_SETTINGS: ExtensionSettings = {
@@ -53,6 +65,11 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   radarrUrl: 'http://localhost:7878',
   sonarrApiKey: '',
   sonarrUrl: 'http://localhost:8989',
+  qbitUrl: 'http://localhost:8080',
+  qbitUsername: 'admin',
+  qbitPassword: '',
+  qbitMovieCategory: 'radarr',
+  qbitTvCategory: 'sonarr',
 };
 
 // ─── API Request/Response Types ──────────────────────────────────────────────
@@ -145,4 +162,27 @@ export interface ArrConfig {
   apiKey: string;
   qualityProfileId?: number;
   rootFolderPath?: string;
+}
+
+// ─── qBittorrent Types ───────────────────────────────────────────────────────
+
+export interface QBittorrentConfig {
+  url: string;
+  username: string;
+  password: string;
+}
+
+export interface MagnetInfo {
+  magnetUri: string;
+  infoHash: string;
+  title: string;
+  cleanTitle: string;
+  type: MediaType;
+}
+
+export interface AddMagnetRequest {
+  magnetUri: string;
+  title: string;
+  type: MediaType;
+  category?: string;
 }

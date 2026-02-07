@@ -10,6 +10,7 @@ import { defineConfig } from 'vite';
 const allEntries: Record<string, string> = {
   'content-imdb': resolve(__dirname, 'src/content/imdb.ts'),
   'content-rottentomatoes': resolve(__dirname, 'src/content/rottentomatoes.ts'),
+  'content-magnet': resolve(__dirname, 'src/content/magnet.ts'),
   'service-worker': resolve(__dirname, 'src/background/service-worker.ts'),
   options: resolve(__dirname, 'src/options/options.ts'),
 };
