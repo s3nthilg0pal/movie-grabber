@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: movie-grabber
-          image: movie-grabber:main
+          image: ghcr.io/s3nthilg0pal/movie-grabber:main
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
