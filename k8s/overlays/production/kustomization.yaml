@@ -8,8 +8,8 @@ resources:
 
 images:
   - name: movie-grabber-api
-    newName: your-registry.com/movie-grabber-api
-    newTag: latest
+    newName: ghcr.io/s3nthilg0pal/movie-grabber
+    newTag: main
 
 replicas:
   - name: movie-grabber-api
