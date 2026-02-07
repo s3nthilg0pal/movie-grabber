@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: movie-grabber
+
+resources:
+  - ../../base
+
+images:
+  - name: movie-grabber-api
+    newName: your-registry.com/movie-grabber-api
+    newTag: latest
+
+replicas:
+  - name: movie-grabber-api
+    count: 1

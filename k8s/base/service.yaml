@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: movie-grabber-api
+  labels:
+    app: movie-grabber-api
+spec:
+  type: LoadBalancer
+  selector:
+    app: movie-grabber-api
+  ports:
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
+      name: http

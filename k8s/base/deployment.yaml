@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: movie-grabber-api
+  labels:
+    app: movie-grabber-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: movie-grabber-api
+  template:
+    metadata:
+      labels:
+        app: movie-grabber-api
+    spec:
+      containers:
+        - name: movie-grabber-api
+          image: movie-grabber-api:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
