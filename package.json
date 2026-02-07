@@ -1,0 +1,21 @@
+{
+  "name": "movie-grabber",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Chrome extension to grab movies/TV series from IMDb & Rotten Tomatoes and add to Radarr/Sonarr",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev -w packages/api",
+    "build:api": "npm run build -w packages/api",
+    "build:extension": "npm run build -w packages/extension",
+    "build": "npm run build:api && npm run build:extension",
+    "lint": "eslint packages/*/src --ext .ts,.tsx"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.3.0"
+  }
+}
