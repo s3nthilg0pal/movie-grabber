@@ -19,7 +19,7 @@ spec:
           image: ghcr.io/s3nthilg0pal/movie-grabber:main
           imagePullPolicy: Always
           ports:
-            - containerPort: 8080
+            - containerPort: 3000
               protocol: TCP
           resources:
             requests:
@@ -31,12 +31,12 @@ spec:
           readinessProbe:
             httpGet:
               path: /health
-              port: 8080
+              port: 3000
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /health
-              port: 8080
+              port: 3000
             initialDelaySeconds: 15
             periodSeconds: 20

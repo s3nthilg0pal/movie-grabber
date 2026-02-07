@@ -10,6 +10,6 @@ spec:
     app: movie-grabber-api
   ports:
     - port: 80
-      targetPort: 8080
+      targetPort: 3000
       protocol: TCP
       name: http
