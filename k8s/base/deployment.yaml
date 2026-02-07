@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: movie-grabber-api
-          image: movie-grabber-api:latest
+          image: movie-grabber-api:main
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
