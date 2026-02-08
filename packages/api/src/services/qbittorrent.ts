@@ -5,11 +5,34 @@ import type { QBittorrentConfig } from '@movie-grabber/shared';
  * Uses cookie-based authentication.
  */
 
+const FETCH_TIMEOUT = 10_000; // 10s
+
+/** Wrapper around fetch with timeout and friendlier error messages. */
+async function qbitFetch(url: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, { ...init, signal: AbortSignal.timeout(FETCH_TIMEOUT) });
+  } catch (err) {
+    const cause = err instanceof Error ? err.cause ?? err : err;
+    // Node.js native fetch wraps the real error in `cause`
+    const code = (cause as NodeJS.ErrnoException)?.code;
+    if (code === 'ECONNREFUSED') {
+      throw new Error(`Cannot reach qBittorrent at ${url} — connection refused. Is it running?`);
+    }
+    if (code === 'ENOTFOUND') {
+      throw new Error(`Cannot reach qBittorrent — hostname not found for ${url}`);
+    }
+    if (err instanceof DOMException && err.name === 'TimeoutError') {
+      throw new Error(`qBittorrent request timed out after ${FETCH_TIMEOUT / 1000}s (${url})`);
+    }
+    throw new Error(`qBittorrent request to ${url} failed: ${err instanceof Error ? err.message : err}`);
+  }
+}
+
 /**
  * Log in to qBittorrent and return the session cookie (SID).
  */
 export async function login(config: QBittorrentConfig): Promise<string> {
-  const res = await fetch(`${config.url}/api/v2/auth/login`, {
+  const res = await qbitFetch(`${config.url}/api/v2/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -27,14 +50,26 @@ export async function login(config: QBittorrentConfig): Promise<string> {
     throw new Error('qBittorrent login failed: invalid credentials');
   }
 
-  // Extract SID cookie
-  const setCookie = res.headers.get('set-cookie') || '';
-  const sidMatch = setCookie.match(/SID=([^;]+)/);
-  if (!sidMatch) {
+  // Extract SID cookie — Node.js exposes getSetCookie() on Headers
+  let sid: string | undefined;
+  const cookies: string[] =
+    typeof res.headers.getSetCookie === 'function'
+      ? res.headers.getSetCookie()
+      : (res.headers.get('set-cookie') || '').split(/,\s*/);
+
+  for (const cookie of cookies) {
+    const match = cookie.match(/SID=([^;]+)/);
+    if (match) {
+      sid = match[1];
+      break;
+    }
+  }
+
+  if (!sid) {
     throw new Error('qBittorrent login succeeded but no SID cookie returned');
   }
 
-  return sidMatch[1];
+  return sid;
 }
 
 /**
@@ -46,7 +81,7 @@ export async function ensureCategory(
   category: string,
 ): Promise<void> {
   // Try to create — qBit returns 200 even if it already exists
-  await fetch(`${config.url}/api/v2/torrents/createCategory`, {
+  await qbitFetch(`${config.url}/api/v2/torrents/createCategory`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -75,7 +110,7 @@ export async function addMagnet(
     body.set('category', category);
   }
 
-  const res = await fetch(`${config.url}/api/v2/torrents/add`, {
+  const res = await qbitFetch(`${config.url}/api/v2/torrents/add`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',

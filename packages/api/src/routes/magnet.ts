@@ -31,23 +31,31 @@ export const magnetRoutes: FastifyPluginAsync = async (fastify) => {
     async (req, reply) => {
       const { magnetUri, title, type, category } = req.body;
 
-      const results: { arr?: string; qbit?: string; error?: string } = {};
+      // Parse year from clean title like "The Matrix (1999)"
+      const yearMatch = title.match(/\(((?:19|20)\d{2})\)\s*$/);
+      const year = yearMatch ? parseInt(yearMatch[1], 10) : undefined;
+      const searchTitle = yearMatch ? title.replace(/\s*\(\d{4}\)\s*$/, '').trim() : title;
+
+      const results: { arr?: string; qbit?: string; arrOk?: boolean; qbitOk?: boolean } = {};
 
       // ── Step 1: Add to *arr ──────────────────────────────────────────────
       try {
         if (type === 'movie') {
           const radarrConfig = extractRadarrConfig(req);
-          const arrResult = await lookupAndAddMovie(radarrConfig, { title });
+          const arrResult = await lookupAndAddMovie(radarrConfig, { title: searchTitle, year });
           results.arr = arrResult.message;
+          results.arrOk = arrResult.success;
         } else {
           const sonarrConfig = extractSonarrConfig(req);
-          const arrResult = await lookupAndAddSeries(sonarrConfig, { title });
+          const arrResult = await lookupAndAddSeries(sonarrConfig, { title: searchTitle, year });
           results.arr = arrResult.message;
+          results.arrOk = arrResult.success;
         }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
         fastify.log.warn(`*arr add failed for "${title}": ${errMsg}`);
-        results.arr = `*arr: ${errMsg}`;
+        results.arr = errMsg;
+        results.arrOk = false;
       }
 
       // ── Step 2: Send magnet to qBittorrent ───────────────────────────────
@@ -56,22 +64,38 @@ export const magnetRoutes: FastifyPluginAsync = async (fastify) => {
         const cat = category || (type === 'movie' ? 'radarr' : 'sonarr');
         await addMagnetToQBit(qbitConfig, magnetUri, cat);
         results.qbit = `Magnet sent to qBittorrent (category: ${cat})`;
+        results.qbitOk = true;
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
         fastify.log.warn(`qBittorrent add failed: ${errMsg}`);
-        results.qbit = `qBittorrent: ${errMsg}`;
+        results.qbit = errMsg;
+        results.qbitOk = false;
       }
 
-      const success = !results.qbit?.startsWith('qBittorrent:');
+      const bothOk = results.arrOk === true && results.qbitOk === true;
+      const anyOk = results.arrOk === true || results.qbitOk === true;
+
+      // Build a user-visible message summarizing both steps
+      const parts: string[] = [];
+      const arrLabel = type === 'movie' ? 'Radarr' : 'Sonarr';
+      if (results.arrOk) {
+        parts.push(`${arrLabel}: ${results.arr}`);
+      } else {
+        parts.push(`${arrLabel} failed: ${results.arr}`);
+      }
+      if (results.qbitOk) {
+        parts.push(results.qbit!);
+      } else {
+        parts.push(`qBittorrent failed: ${results.qbit}`);
+      }
+
       const response: ApiResponse = {
-        success,
-        message: success
-          ? `Magnet added successfully for "${title}"`
-          : `Partial failure for "${title}"`,
+        success: bothOk,
+        message: parts.join(' | '),
         data: results,
       };
 
-      return reply.status(success ? 200 : 207).send(response);
+      return reply.status(bothOk ? 200 : anyOk ? 207 : 500).send(response);
     },
   );
 };

@@ -213,6 +213,30 @@ const STYLES = `
     border-color: #93c5fd;
     color: #93c5fd;
   }
+
+  .mg-item-status {
+    font-size: 11px;
+    margin-top: 6px;
+    line-height: 1.4;
+    padding: 4px 8px;
+    border-radius: 4px;
+    word-break: break-word;
+  }
+
+  .mg-item-status.ok {
+    background: #064e3b;
+    color: #6ee7b7;
+  }
+
+  .mg-item-status.partial {
+    background: #78350f;
+    color: #fcd34d;
+  }
+
+  .mg-item-status.fail {
+    background: #450a0a;
+    color: #fca5a5;
+  }
 `;
 
 // ─── Build panel ─────────────────────────────────────────────────────────────
@@ -291,9 +315,14 @@ if (magnets.length === 0) {
     badges.appendChild(badge);
     badges.appendChild(toggleBtn);
 
+    const statusEl = document.createElement('div');
+    statusEl.className = 'mg-item-status';
+    statusEl.style.display = 'none';
+
     info.appendChild(title);
     info.appendChild(raw);
     info.appendChild(badges);
+    info.appendChild(statusEl);
 
     const addBtn = document.createElement('button');
     addBtn.className = 'mg-add-btn';
@@ -301,6 +330,7 @@ if (magnets.length === 0) {
     addBtn.addEventListener('click', async () => {
       addBtn.disabled = true;
       addBtn.textContent = 'Adding...';
+      statusEl.style.display = 'none';
 
       try {
         const response: ExtensionResponse = await new Promise((resolve, reject) => {
@@ -321,26 +351,39 @@ if (magnets.length === 0) {
           );
         });
 
+        // Show detailed status message
+        statusEl.textContent = response.message;
+        statusEl.style.display = 'block';
+
         if (response.success) {
           addBtn.dataset.state = 'success';
           addBtn.textContent = 'Added ✓';
+          statusEl.className = 'mg-item-status ok';
         } else {
-          addBtn.dataset.state = 'error';
-          addBtn.textContent = 'Failed';
-          setTimeout(() => {
-            addBtn.dataset.state = '';
-            addBtn.textContent = 'Retry';
-            addBtn.disabled = false;
-          }, 3000);
+          // Partial success (e.g., qBit ok but *arr failed) or full failure
+          const isPartial = response.message.includes('Magnet sent');
+          addBtn.dataset.state = isPartial ? 'success' : 'error';
+          addBtn.textContent = isPartial ? 'Partial ⚠' : 'Failed';
+          statusEl.className = `mg-item-status ${isPartial ? 'partial' : 'fail'}`;
+          if (!response.success) {
+            setTimeout(() => {
+              addBtn.dataset.state = '';
+              addBtn.textContent = 'Retry';
+              addBtn.disabled = false;
+            }, 5000);
+          }
         }
       } catch (err) {
         addBtn.dataset.state = 'error';
         addBtn.textContent = 'Error';
+        statusEl.textContent = err instanceof Error ? err.message : 'Unknown error';
+        statusEl.className = 'mg-item-status fail';
+        statusEl.style.display = 'block';
         setTimeout(() => {
           addBtn.dataset.state = '';
           addBtn.textContent = 'Retry';
           addBtn.disabled = false;
-        }, 3000);
+        }, 5000);
       }
     });
 

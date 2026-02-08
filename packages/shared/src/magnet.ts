@@ -23,7 +23,7 @@ export function parseMagnetUri(uri: string): MagnetInfo | null {
 }
 
 /**
- * Clean up a torrent display name — strip quality tags, codecs, groups, etc.
+ * Clean up a torrent display name — strip site prefixes, quality tags, codecs, groups, etc.
  * Returns a human-readable title with year if found.
  */
 export function cleanTorrentName(name: string): string {
@@ -32,16 +32,44 @@ export function cleanTorrentName(name: string): string {
   // Replace dots/underscores with spaces
   cleaned = cleaned.replace(/[._]/g, ' ');
 
-  // Cut at common quality/release markers
+  // ── Strip leading site name prefixes ────────────────────────────────────
+  // Patterns: "www.1TamilMV.pink -", "www.TamilBlasters.com -", "[YTS.MX]", etc.
+
+  // Remove bracketed group tags at start: [YTS.MX], [TGx], (1TamilMV), etc.
+  cleaned = cleaned.replace(/^(?:\[[^\]]*\]|\([^)]*\))\s*/g, '');
+
+  // Remove "www<sep><sitename>[<sep><tld>][<sep><tag>] <sep>" prefix
+  // Works with dots already replaced to spaces: "www 1TamilMV pink - "
+  cleaned = cleaned.replace(
+    /^www[\s.]+\S+[\s.]+(?:\S+[\s.]+)*?[-–—:]+\s*/i,
+    '',
+  );
+
+  // Remove common release group color/label tags that precede the title
+  // e.g., "pink -", "gold -", "teal -"
+  cleaned = cleaned.replace(
+    /^\s*(?:pink|gold|teal|green|red|blue|yellow|silver|purple|cyan|orange)\s*[-–—:]+\s*/i,
+    '',
+  );
+
+  // Another pass for remaining leading junk like "- " after stripping
+  cleaned = cleaned.replace(/^\s*[-–—:]+\s*/, '');
+
+  // ── Extract year early (it helps with cutting) ──────────────────────────
+  const yearMatch = cleaned.match(/\(?\b((?:19|20)\d{2})\b\)?/);
+  const year = yearMatch ? yearMatch[1] : '';
+
+  // ── Cut at quality/release markers ──────────────────────────────────────
   const cutPatterns = [
-    /\b(720p|1080p|2160p|4[Kk]|UHD)\b/,
-    /\b(BluRay|BDRip|BRRip|WEB-?DL|WEB-?Rip|HDRip|DVDRip|HDTV|PDTV)\b/i,
-    /\b(x264|x265|h\.?264|h\.?265|HEVC|AVC|XviD|DivX)\b/i,
-    /\b(AAC|AC3|DTS|DD5|FLAC|MP3|TrueHD|Atmos)\b/i,
-    /\b(YIFY|YTS|RARBG|SPARKS|GECKOS|FGT|EVO|ETRG|STUTTERSHIT)\b/i,
-    /\b(REMASTERED|EXTENDED|UNRATED|PROPER|DIRECTORS CUT|IMAX)\b/i,
-    /\bS\d{2}E\d{2}\b/i, // cut at episode marker
-    /\bS\d{2}\b/i, // cut at season marker
+    /\b(720p|1080p|2160p|4[Kk]|UHD)\b/i,
+    /\b(BluRay|Blu-Ray|BDRip|BRRip|WEB-?DL|WEB-?Rip|WEBRip|HDRip|DVDRip|DVDScr|HDTV|PDTV|CAMRip|HDCAM|HDR|SDR)\b/i,
+    /\b(x264|x265|h\.?264|h\.?265|HEVC|AVC|XviD|DivX|AV1|10bit)\b/i,
+    /\b(AAC|AAC2|AC3|DTS|DD5|DD2|FLAC|MP3|TrueHD|Atmos|EAC3|LPCM)\b/i,
+    /\b(YIFY|YTS|RARBG|SPARKS|GECKOS|FGT|EVO|ETRG|STUTTERSHIT|AMZN|NF|DSNP|HMAX|ATVP|PCOK|MA)\b/i,
+    /\b(REMASTERED|EXTENDED|UNRATED|PROPER|DIRECTORS CUT|IMAX|CRITERION|REMUX)\b/i,
+    /\b(Dual Audio|Multi Audio|Hindi|Tamil|Telugu|English|ESub|ESubs|HQ)\b/i,
+    /\bS\d{2}E\d{2}\b/i,
+    /\bS\d{2}\b/i,
     /\bSeason \d+/i,
     /\bComplete Season/i,
   ];
@@ -54,20 +82,39 @@ export function cleanTorrentName(name: string): string {
     }
   }
 
-  // Extract year
-  const yearMatch = cleaned.match(/\(?\b((?:19|20)\d{2})\b\)?/);
-  const year = yearMatch ? yearMatch[1] : '';
-
-  // Remove the year from the title, then re-append it cleanly
+  // If we already found a year, also try cutting at the year boundary
+  // to remove anything after it (e.g., "Spider-Man (2012) BluRay" → "Spider-Man (2012)")
   if (year) {
-    cleaned = cleaned.replace(/\(?\b(?:19|20)\d{2}\b\)?/, '');
+    const yearIdx = cleaned.search(/\(?\b(?:19|20)\d{2}\b\)?/);
+    if (yearIdx >= 0) {
+      const afterYear = cleaned.substring(yearIdx).replace(/\(?\b(?:19|20)\d{2}\b\)?\s*/, '');
+      // If there's still junk after the year, cut it
+      if (afterYear.trim().length > 0) {
+        cleaned = cleaned.substring(0, yearIdx);
+      }
+    }
   }
+
+  // Remove the year from the title text (we'll re-append it cleanly)
+  if (year) {
+    cleaned = cleaned.replace(/\(?\b(?:19|20)\d{2}\b\)?\s*/, '');
+  }
+
+  // ── Final cleanup ───────────────────────────────────────────────────────
+  // Remove any residual quality/codec words that weren't caught by cut
+  cleaned = cleaned.replace(
+    /\b(BluRay|Blu-Ray|BDRip|BRRip|WEB-?DL|WEB-?Rip|HDRip|DVDRip|HDTV|HEVC|x264|x265|10bit|HDR|SDR|REMUX|720p|1080p|2160p|4K)\b/gi,
+    '',
+  );
 
   // Trim and collapse spaces
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
 
-  // Remove trailing hyphens or brackets
-  cleaned = cleaned.replace(/[-[\]()]+$/, '').trim();
+  // Remove trailing hyphens, brackets, or dashes
+  cleaned = cleaned.replace(/[\s\-–—[\]()]+$/, '').trim();
+
+  // Remove leading hyphens/dashes
+  cleaned = cleaned.replace(/^[\s\-–—]+/, '').trim();
 
   return year ? `${cleaned} (${year})` : cleaned;
 }
