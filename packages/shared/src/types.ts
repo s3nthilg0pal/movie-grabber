@@ -82,11 +82,22 @@ export interface AddMovieRequest {
   rootFolderPath?: string;
 }
 
+export interface MovieStatusRequest {
+  title: string;
+  year?: number;
+  imdbId?: string;
+}
+
 export interface AddSeriesRequest {
   title: string;
   year?: number;
   qualityProfileId?: number;
   rootFolderPath?: string;
+}
+
+export interface SeriesStatusRequest {
+  title: string;
+  year?: number;
 }
 
 export interface ApiResponse<T = unknown> {

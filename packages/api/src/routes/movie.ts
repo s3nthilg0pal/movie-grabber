@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
-import type { AddMovieRequest, ApiResponse } from '@movie-grabber/shared';
+import type { AddMovieRequest, ApiResponse, MovieStatusRequest } from '@movie-grabber/shared';
 import { extractRadarrConfig } from '../utils/config.js';
-import { lookupAndAddMovie } from '../services/radarr.js';
+import { findExistingMovie, lookupAndAddMovie } from '../services/radarr.js';
 
 const addMovieSchema = {
   body: {
@@ -13,6 +13,18 @@ const addMovieSchema = {
       imdbId: { type: 'string', pattern: '^tt\\d{7,}$' },
       qualityProfileId: { type: 'number' },
       rootFolderPath: { type: 'string' },
+    },
+  },
+};
+
+const movieStatusSchema = {
+  body: {
+    type: 'object',
+    required: ['title'],
+    properties: {
+      title: { type: 'string', minLength: 1 },
+      year: { type: 'number' },
+      imdbId: { type: 'string', pattern: '^tt\\d{7,}$' },
     },
   },
 };
@@ -57,39 +69,33 @@ export const movieRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // GET /api/movie/status/:imdbId
-  fastify.get<{ Params: { imdbId: string } }>(
-    '/status/:imdbId',
+  // POST /api/movie/status
+  fastify.post<{ Body: MovieStatusRequest }>(
+    '/status',
+    { schema: movieStatusSchema },
     async (req, reply) => {
       try {
         const config = extractRadarrConfig(req);
-        const { lookupMovieByImdbId, getExistingMovies } = await import('../services/radarr.js');
-
-        // Lookup the movie to get its tmdbId
-        const lookupResult = await lookupMovieByImdbId(config, req.params.imdbId);
-        if (!lookupResult) {
-          return reply.send({ success: true, data: { exists: false } });
-        }
-
-        const movie = Array.isArray(lookupResult) ? lookupResult[0] : lookupResult;
-        if (!movie) {
-          return reply.send({ success: true, data: { exists: false } });
-        }
-
-        const existing = await getExistingMovies(config);
-        const found = existing.find((m) => m.tmdbId === movie.tmdbId);
+        const found = await findExistingMovie(config, {
+          title: req.body.title,
+          year: req.body.year,
+          imdbId: req.body.imdbId,
+        });
 
         return reply.send({
           success: true,
+          message: found
+            ? `"${found.title}" is already in Radarr`
+            : `"${req.body.title}" is not in Radarr`,
           data: {
             exists: !!found,
-            title: movie.title,
+            title: found?.title ?? req.body.title,
             status: found ? (found.hasFile ? 'downloaded' : 'monitored') : undefined,
           },
-        });
+        } satisfies ApiResponse);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
-        return reply.status(500).send({ success: false, message });
+        return reply.status(500).send({ success: false, message } satisfies ApiResponse);
       }
     },
   );

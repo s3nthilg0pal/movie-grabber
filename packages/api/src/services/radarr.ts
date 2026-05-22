@@ -26,6 +26,51 @@ async function radarrFetch<T>(
   return res.json() as Promise<T>;
 }
 
+function normalizeTitle(title: string): string {
+  return title
+    .normalize('NFKD')
+    .replace(/[^a-zA-Z0-9]+/g, '')
+    .toLowerCase();
+}
+
+function selectBestMovieMatch(results: RadarrMovie[], year?: number): RadarrMovie | undefined {
+  if (!results.length) {
+    return undefined;
+  }
+
+  if (year && results.length > 1) {
+    const yearMatch = results.find((movie) => movie.year === year);
+    if (yearMatch) {
+      return yearMatch;
+    }
+  }
+
+  return results[0];
+}
+
+function findExistingMovieInLibrary(
+  movies: RadarrMovie[],
+  params: { title: string; year?: number; imdbId?: string; tmdbId?: number },
+): RadarrMovie | undefined {
+  const normalizedTitle = normalizeTitle(params.title);
+
+  return movies.find((movie) => {
+    if (params.tmdbId && movie.tmdbId === params.tmdbId) {
+      return true;
+    }
+
+    if (params.imdbId && movie.imdbId === params.imdbId) {
+      return true;
+    }
+
+    if (normalizeTitle(movie.title) !== normalizedTitle) {
+      return false;
+    }
+
+    return params.year === undefined || movie.year === params.year;
+  });
+}
+
 // ─── Lookup ──────────────────────────────────────────────────────────────────
 
 export async function lookupMovieByImdbId(
@@ -51,6 +96,45 @@ export async function getExistingMovies(config: ArrConfig): Promise<RadarrMovie[
 export async function movieExists(config: ArrConfig, tmdbId: number): Promise<boolean> {
   const movies = await getExistingMovies(config);
   return movies.some((m) => m.tmdbId === tmdbId);
+}
+
+export async function findExistingMovie(
+  config: ArrConfig,
+  params: { title: string; year?: number; imdbId?: string },
+): Promise<RadarrMovie | undefined> {
+  const existingMovies = await getExistingMovies(config);
+  const directMatch = findExistingMovieInLibrary(existingMovies, params);
+
+  if (directMatch) {
+    return directMatch;
+  }
+
+  let lookupMatch: RadarrMovie | undefined;
+
+  if (params.imdbId) {
+    const lookup = await radarrFetch<RadarrMovie>(
+      config,
+      `/movie/lookup/imdb?imdbId=${encodeURIComponent(params.imdbId)}`,
+    ).catch(() => undefined);
+
+    if (lookup) {
+      lookupMatch = lookup;
+    }
+  } else {
+    const results = await lookupMovieByTitle(config, params.title).catch(() => []);
+    lookupMatch = selectBestMovieMatch(results, params.year);
+  }
+
+  if (!lookupMatch) {
+    return undefined;
+  }
+
+  return findExistingMovieInLibrary(existingMovies, {
+    title: lookupMatch.title,
+    year: lookupMatch.year,
+    imdbId: lookupMatch.imdbId,
+    tmdbId: lookupMatch.tmdbId,
+  });
 }
 
 // ─── Add movie ───────────────────────────────────────────────────────────────
@@ -116,16 +200,20 @@ export async function lookupAndAddMovie(
     return { success: false, message: `No movie found for "${params.title}"` };
   }
 
-  // Pick best match — first result if IMDb lookup, or filter by year
-  let match = results[0];
-  if (params.year && results.length > 1) {
-    const yearMatch = results.find((m) => m.year === params.year);
-    if (yearMatch) match = yearMatch;
+  const match = selectBestMovieMatch(results, params.year);
+  if (!match) {
+    return { success: false, message: `No movie found for "${params.title}"` };
   }
 
   // 2. Check duplicate
-  const exists = await movieExists(config, match.tmdbId);
-  if (exists) {
+  const existingMovies = await getExistingMovies(config);
+  const existing = findExistingMovieInLibrary(existingMovies, {
+    title: match.title,
+    year: match.year,
+    imdbId: match.imdbId,
+    tmdbId: match.tmdbId,
+  });
+  if (existing) {
     return { success: true, message: `"${match.title}" already exists in Radarr`, alreadyExists: true };
   }
 

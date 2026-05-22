@@ -8,8 +8,9 @@
   ],
   "scripts": {
     "dev:api": "npm run dev -w packages/api",
-    "build:api": "npm run build -w packages/api",
-    "build:extension": "npm run build -w packages/extension",
+    "build:shared": "npm run build -w packages/shared",
+    "build:api": "npm run build:shared && npm run build -w packages/api",
+    "build:extension": "npm run build:shared && npm run build -w packages/extension",
     "build": "npm run build:api && npm run build:extension",
     "lint": "eslint packages/*/src --ext .ts,.tsx"
   },

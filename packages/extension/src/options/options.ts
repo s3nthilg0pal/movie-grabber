@@ -168,6 +168,43 @@ async function loadProfiles(service: 'radarr' | 'sonarr') {
   }
 }
 
+async function testQbit() {
+  const backendUrl = $<HTMLInputElement>('backendUrl').value.replace(/\/+$/, '');
+  const qbitUrl = $<HTMLInputElement>('qbitUrl').value.replace(/\/+$/, '');
+
+  if (!backendUrl) return showStatus('Enter a backend URL first', true);
+  if (!qbitUrl) return showStatus('Enter a qBittorrent URL first', true);
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Qbit-Url': qbitUrl,
+  };
+
+  const username = $<HTMLInputElement>('qbitUsername').value;
+  const password = $<HTMLInputElement>('qbitPassword').value;
+  if (username) headers['X-Qbit-Username'] = username;
+  if (password) headers['X-Qbit-Password'] = password;
+
+  try {
+    const res = await fetch(`${backendUrl}/api/config/qbit/test`, { headers });
+    const data = await res.json();
+
+    if (res.status === 404) {
+      showStatus('Backend does not support qBittorrent testing yet. Redeploy the API first.', true);
+      return;
+    }
+
+    if (!data.success) {
+      showStatus(`qBittorrent failed: ${data.message || 'Unknown error'}`, true);
+      return;
+    }
+
+    showStatus(data.message || 'qBittorrent connected');
+  } catch (err) {
+    showStatus(`qBittorrent test failed: ${err instanceof Error ? err.message : err}`, true);
+  }
+}
+
 // ─── Event listeners ─────────────────────────────────────────────────────────
 
 $('save').addEventListener('click', saveSettings);
@@ -179,6 +216,7 @@ $('reset').addEventListener('click', async () => {
 $('testBackend').addEventListener('click', testBackend);
 $('testRadarr').addEventListener('click', () => loadProfiles('radarr'));
 $('testSonarr').addEventListener('click', () => loadProfiles('sonarr'));
+$('testQbit').addEventListener('click', testQbit);
 
 // Load on open
 loadSettings();

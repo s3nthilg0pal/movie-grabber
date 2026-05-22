@@ -7,6 +7,22 @@ import type { QBittorrentConfig } from '@movie-grabber/shared';
 
 const FETCH_TIMEOUT = 10_000; // 10s
 
+function qbitRequestOrigin(config: QBittorrentConfig): string {
+  return new URL(config.url).origin;
+}
+
+function qbitHeaders(
+  config: QBittorrentConfig,
+  headers?: Record<string, string>,
+): Record<string, string> {
+  const origin = qbitRequestOrigin(config);
+  return {
+    ...headers,
+    Origin: origin,
+    Referer: origin,
+  };
+}
+
 /** Wrapper around fetch with timeout and friendlier error messages. */
 async function qbitFetch(url: string, init?: RequestInit): Promise<Response> {
   try {
@@ -34,20 +50,23 @@ async function qbitFetch(url: string, init?: RequestInit): Promise<Response> {
 export async function login(config: QBittorrentConfig): Promise<string> {
   const res = await qbitFetch(`${config.url}/api/v2/auth/login`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: qbitHeaders(config, { 'Content-Type': 'application/x-www-form-urlencoded' }),
     body: new URLSearchParams({
       username: config.username,
       password: config.password,
     }),
   });
 
+  const text = await res.text();
   if (!res.ok) {
-    throw new Error(`qBittorrent login failed: HTTP ${res.status}`);
+    const detail = text.trim();
+    throw new Error(
+      `qBittorrent login failed: HTTP ${res.status}${detail ? ` (${detail})` : ''}`,
+    );
   }
 
-  const text = await res.text();
   if (text.trim() !== 'Ok.') {
-    throw new Error('qBittorrent login failed: invalid credentials');
+    throw new Error(`qBittorrent login failed: ${text.trim() || 'invalid credentials'}`);
   }
 
   // Extract SID cookie — Node.js exposes getSetCookie() on Headers
@@ -72,6 +91,24 @@ export async function login(config: QBittorrentConfig): Promise<string> {
   return sid;
 }
 
+export async function testConnection(config: QBittorrentConfig): Promise<string> {
+  const sid = await login(config);
+  const res = await qbitFetch(`${config.url}/api/v2/app/version`, {
+    headers: qbitHeaders(config, { Cookie: `SID=${sid}` }),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(
+      `qBittorrent version check failed: HTTP ${res.status}${
+        detail.trim() ? ` (${detail.trim()})` : ''
+      }`,
+    );
+  }
+
+  return (await res.text()).trim();
+}
+
 /**
  * Ensure a category exists in qBittorrent. Creates it if it doesn't exist.
  */
@@ -83,10 +120,10 @@ export async function ensureCategory(
   // Try to create — qBit returns 200 even if it already exists
   await qbitFetch(`${config.url}/api/v2/torrents/createCategory`, {
     method: 'POST',
-    headers: {
+    headers: qbitHeaders(config, {
       'Content-Type': 'application/x-www-form-urlencoded',
       Cookie: `SID=${sid}`,
-    },
+    }),
     body: new URLSearchParams({ category, savePath: '' }),
   });
 }
@@ -112,10 +149,10 @@ export async function addMagnet(
 
   const res = await qbitFetch(`${config.url}/api/v2/torrents/add`, {
     method: 'POST',
-    headers: {
+    headers: qbitHeaders(config, {
       'Content-Type': 'application/x-www-form-urlencoded',
       Cookie: `SID=${sid}`,
-    },
+    }),
     body,
   });
 

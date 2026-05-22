@@ -100,6 +100,25 @@ function init() {
       setState('error', errMsg);
     }
   });
+
+  void (async () => {
+    setState('checking');
+
+    const message: ExtensionMessage = { action: 'checkStatus', media };
+
+    try {
+      const response: ExtensionResponse = await chrome.runtime.sendMessage(message);
+
+      if (response.success && response.alreadyExists) {
+        setState('exists', response.message);
+        return;
+      }
+    } catch (err) {
+      console.warn('[Movie Grabber] Status check failed:', err);
+    }
+
+    setState('idle');
+  })();
 }
 
 // Run when DOM is ready

@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
-import type { AddSeriesRequest, ApiResponse } from '@movie-grabber/shared';
+import type { AddSeriesRequest, ApiResponse, SeriesStatusRequest } from '@movie-grabber/shared';
 import { extractSonarrConfig } from '../utils/config.js';
-import { lookupAndAddSeries } from '../services/sonarr.js';
+import { findExistingSeries, lookupAndAddSeries } from '../services/sonarr.js';
 
 const addSeriesSchema = {
   body: {
@@ -12,6 +12,17 @@ const addSeriesSchema = {
       year: { type: 'number' },
       qualityProfileId: { type: 'number' },
       rootFolderPath: { type: 'string' },
+    },
+  },
+};
+
+const seriesStatusSchema = {
+  body: {
+    type: 'object',
+    required: ['title'],
+    properties: {
+      title: { type: 'string', minLength: 1 },
+      year: { type: 'number' },
     },
   },
 };
@@ -54,29 +65,31 @@ export const seriesRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // GET /api/series/status/:title
-  fastify.get<{ Params: { title: string } }>(
-    '/status/:title',
+  // POST /api/series/status
+  fastify.post<{ Body: SeriesStatusRequest }>(
+    '/status',
+    { schema: seriesStatusSchema },
     async (req, reply) => {
       try {
         const config = extractSonarrConfig(req);
-        const { getExistingSeries } = await import('../services/sonarr.js');
-
-        const existing = await getExistingSeries(config);
-        const found = existing.find(
-          (s) => s.title.toLowerCase() === req.params.title.toLowerCase(),
-        );
+        const found = await findExistingSeries(config, {
+          title: req.body.title,
+          year: req.body.year,
+        });
 
         return reply.send({
           success: true,
+          message: found
+            ? `"${found.title}" is already in Sonarr`
+            : `"${req.body.title}" is not in Sonarr`,
           data: {
             exists: !!found,
-            title: found?.title,
+            title: found?.title ?? req.body.title,
           },
-        });
+        } satisfies ApiResponse);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
-        return reply.status(500).send({ success: false, message });
+        return reply.status(500).send({ success: false, message } satisfies ApiResponse);
       }
     },
   );

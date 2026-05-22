@@ -1,6 +1,6 @@
 import type { MediaType } from '@movie-grabber/shared';
 
-export type ButtonState = 'idle' | 'loading' | 'success' | 'exists' | 'error';
+export type ButtonState = 'idle' | 'checking' | 'loading' | 'success' | 'exists' | 'error';
 
 const BUTTON_ID = 'movie-grabber-root';
 
@@ -48,6 +48,7 @@ const STYLES = `
     transform: translateY(0);
   }
 
+  .mg-button[data-state="checking"],
   .mg-button[data-state="loading"] {
     opacity: 0.8;
     cursor: wait;
@@ -60,6 +61,8 @@ const STYLES = `
 
   .mg-button[data-state="exists"] {
     background: #ca8a04;
+    cursor: default;
+    pointer-events: none;
   }
 
   .mg-button[data-state="error"] {
@@ -105,6 +108,7 @@ const STYLES = `
 
 const ICONS: Record<ButtonState, string> = {
   idle: `<svg class="mg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>`,
+  checking: `<div class="mg-spinner"></div>`,
   loading: `<div class="mg-spinner"></div>`,
   success: `<svg class="mg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>`,
   exists: `<svg class="mg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>`,
@@ -116,12 +120,14 @@ function getLabelText(state: ButtonState, type: MediaType): string {
   switch (state) {
     case 'idle':
       return `Add to ${target}`;
+    case 'checking':
+      return 'Checking...';
     case 'loading':
       return 'Adding...';
     case 'success':
       return 'Added!';
     case 'exists':
-      return 'Already exists';
+      return 'Already present';
     case 'error':
       return 'Failed';
   }
@@ -160,6 +166,7 @@ export function injectButton(
 
   // Button
   const button = document.createElement('button');
+  button.type = 'button';
   button.className = 'mg-button';
   button.dataset.state = 'idle';
   button.innerHTML = `${ICONS.idle}<span>${getLabelText('idle', type)}</span>`;
@@ -172,6 +179,7 @@ export function injectButton(
 
   function setState(state: ButtonState, message?: string) {
     button.dataset.state = state;
+    button.disabled = state === 'checking' || state === 'loading' || state === 'exists';
     button.innerHTML = `${ICONS[state]}<span>${getLabelText(state, type)}</span>`;
 
     if (message) {
@@ -185,10 +193,11 @@ export function injectButton(
       toast.style.display = 'none';
     }
 
-    // Reset to idle after success/exists/error states
-    if (state === 'success' || state === 'exists' || state === 'error') {
+    // Reset transient states after a short delay.
+    if (state === 'success' || state === 'error') {
       setTimeout(() => {
         button.dataset.state = 'idle';
+        button.disabled = false;
         button.innerHTML = `${ICONS.idle}<span>${getLabelText('idle', type)}</span>`;
       }, 4000);
     }

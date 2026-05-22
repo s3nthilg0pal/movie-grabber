@@ -39,6 +39,9 @@ npm install
 # Start the backend API (development mode with hot reload)
 npm run dev:api
 
+# Build shared types
+npm run build:shared
+
 # Build the Chrome extension
 npm run build:extension
 ```
@@ -70,8 +73,8 @@ Open the extension's **Options** page to configure:
 | `GET` | `/health` | Health check |
 | `POST` | `/api/movie/add` | Add a movie to Radarr |
 | `POST` | `/api/series/add` | Add a TV series to Sonarr |
-| `GET` | `/api/movie/status/:imdbId` | Check if movie exists in Radarr |
-| `GET` | `/api/series/status/:title` | Check if series exists in Sonarr |
+| `POST` | `/api/movie/status` | Check if movie exists in Radarr |
+| `POST` | `/api/series/status` | Check if series exists in Sonarr |
 | `GET` | `/api/config/profiles` | Get quality profiles & root folders |
 
 All endpoints expect *arr configuration via request headers:

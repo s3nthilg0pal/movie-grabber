@@ -26,6 +26,51 @@ async function sonarrFetch<T>(
   return res.json() as Promise<T>;
 }
 
+function normalizeTitle(title: string): string {
+  return title
+    .normalize('NFKD')
+    .replace(/[^a-zA-Z0-9]+/g, '')
+    .toLowerCase();
+}
+
+function selectBestSeriesMatch(results: SonarrSeries[], year?: number): SonarrSeries | undefined {
+  if (!results.length) {
+    return undefined;
+  }
+
+  if (year && results.length > 1) {
+    const yearMatch = results.find((series) => series.year === year);
+    if (yearMatch) {
+      return yearMatch;
+    }
+  }
+
+  return results[0];
+}
+
+function findExistingSeriesInLibrary(
+  series: SonarrSeries[],
+  params: { title: string; year?: number; tvdbId?: number; imdbId?: string },
+): SonarrSeries | undefined {
+  const normalizedTitle = normalizeTitle(params.title);
+
+  return series.find((item) => {
+    if (params.tvdbId && item.tvdbId === params.tvdbId) {
+      return true;
+    }
+
+    if (params.imdbId && item.imdbId === params.imdbId) {
+      return true;
+    }
+
+    if (normalizeTitle(item.title) !== normalizedTitle) {
+      return false;
+    }
+
+    return params.year === undefined || item.year === params.year;
+  });
+}
+
 // ─── Lookup ──────────────────────────────────────────────────────────────────
 
 export async function lookupSeriesByTitle(
@@ -44,6 +89,32 @@ export async function getExistingSeries(config: ArrConfig): Promise<SonarrSeries
 export async function seriesExists(config: ArrConfig, tvdbId: number): Promise<boolean> {
   const series = await getExistingSeries(config);
   return series.some((s) => s.tvdbId === tvdbId);
+}
+
+export async function findExistingSeries(
+  config: ArrConfig,
+  params: { title: string; year?: number },
+): Promise<SonarrSeries | undefined> {
+  const existingSeries = await getExistingSeries(config);
+  const directMatch = findExistingSeriesInLibrary(existingSeries, params);
+
+  if (directMatch) {
+    return directMatch;
+  }
+
+  const results = await lookupSeriesByTitle(config, params.title).catch(() => []);
+  const lookupMatch = selectBestSeriesMatch(results, params.year);
+
+  if (!lookupMatch) {
+    return undefined;
+  }
+
+  return findExistingSeriesInLibrary(existingSeries, {
+    title: lookupMatch.title,
+    year: lookupMatch.year,
+    tvdbId: lookupMatch.tvdbId,
+    imdbId: lookupMatch.imdbId,
+  });
 }
 
 // ─── Add series ──────────────────────────────────────────────────────────────
@@ -101,16 +172,20 @@ export async function lookupAndAddSeries(
     return { success: false, message: `No series found for "${params.title}"` };
   }
 
-  // Pick best match — filter by year if provided
-  let match = results[0];
-  if (params.year && results.length > 1) {
-    const yearMatch = results.find((s) => s.year === params.year);
-    if (yearMatch) match = yearMatch;
+  const match = selectBestSeriesMatch(results, params.year);
+  if (!match) {
+    return { success: false, message: `No series found for "${params.title}"` };
   }
 
   // 2. Check duplicate
-  const exists = await seriesExists(config, match.tvdbId);
-  if (exists) {
+  const existingSeries = await getExistingSeries(config);
+  const existing = findExistingSeriesInLibrary(existingSeries, {
+    title: match.title,
+    year: match.year,
+    tvdbId: match.tvdbId,
+    imdbId: match.imdbId,
+  });
+  if (existing) {
     return {
       success: true,
       message: `"${match.title}" already exists in Sonarr`,

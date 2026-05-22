@@ -89,11 +89,19 @@ async function checkStatus(media: MediaInfo): Promise<ExtensionResponse> {
 
   const endpoint =
     media.type === 'movie'
-      ? `${settings.backendUrl}/api/movie/status/${encodeURIComponent(media.imdbId || media.title)}`
-      : `${settings.backendUrl}/api/series/status/${encodeURIComponent(media.title)}`;
+      ? `${settings.backendUrl}/api/movie/status`
+      : `${settings.backendUrl}/api/series/status`;
+
+  const body = JSON.stringify({
+    title: media.title,
+    year: media.year,
+    ...(media.imdbId ? { imdbId: media.imdbId } : {}),
+  });
 
   const res = await fetch(endpoint, {
+    method: 'POST',
     headers: buildHeaders(settings),
+    body,
   });
 
   const data: ApiResponse = await res.json();
