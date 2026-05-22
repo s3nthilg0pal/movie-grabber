@@ -45,7 +45,9 @@ async function qbitFetch(url: string, init?: RequestInit): Promise<Response> {
 }
 
 /**
- * Log in to qBittorrent and return the session cookie (SID).
+ * Log in to qBittorrent and return the session cookie as a full `name=value` pair
+ * (ready to send back as a `Cookie` header). Newer qBittorrent versions use a
+ * port-scoped cookie name like `QBT_SID_8080` instead of the legacy `SID`.
  */
 export async function login(config: QBittorrentConfig): Promise<string> {
   const res = await qbitFetch(`${config.url}/api/v2/auth/login`, {
@@ -65,36 +67,47 @@ export async function login(config: QBittorrentConfig): Promise<string> {
     );
   }
 
-  if (text.trim() !== 'Ok.') {
-    throw new Error(`qBittorrent login failed: ${text.trim() || 'invalid credentials'}`);
+  // qBittorrent <5 returns 200 "Ok."/"Fails."; qBittorrent ≥5 returns 204 empty
+  // on success and 403 (or 200 "Fails.") on failure.
+  const body = text.trim();
+  if (body === 'Fails.') {
+    throw new Error('qBittorrent login failed: invalid username or password');
+  }
+  if (res.status !== 204 && body !== 'Ok.') {
+    const preview = body.length > 200 ? `${body.slice(0, 200)}…` : body;
+    throw new Error(
+      `qBittorrent login failed: unexpected response (HTTP ${res.status})${
+        preview ? ` "${preview}"` : ' with empty body'
+      }`,
+    );
   }
 
-  // Extract SID cookie — Node.js exposes getSetCookie() on Headers
-  let sid: string | undefined;
+  // Extract session cookie. Modern qBit uses `QBT_SID_<port>=…`, older uses `SID=…`.
   const cookies: string[] =
     typeof res.headers.getSetCookie === 'function'
       ? res.headers.getSetCookie()
       : (res.headers.get('set-cookie') || '').split(/,\s*/);
 
+  let sessionCookie: string | undefined;
   for (const cookie of cookies) {
-    const match = cookie.match(/SID=([^;]+)/);
+    const match = cookie.match(/(QBT_SID[^=]*|SID)=([^;]+)/);
     if (match) {
-      sid = match[1];
+      sessionCookie = `${match[1]}=${match[2]}`;
       break;
     }
   }
 
-  if (!sid) {
-    throw new Error('qBittorrent login succeeded but no SID cookie returned');
+  if (!sessionCookie) {
+    throw new Error('qBittorrent login succeeded but no session cookie returned');
   }
 
-  return sid;
+  return sessionCookie;
 }
 
 export async function testConnection(config: QBittorrentConfig): Promise<string> {
-  const sid = await login(config);
+  const cookie = await login(config);
   const res = await qbitFetch(`${config.url}/api/v2/app/version`, {
-    headers: qbitHeaders(config, { Cookie: `SID=${sid}` }),
+    headers: qbitHeaders(config, { Cookie: cookie }),
   });
 
   if (!res.ok) {
@@ -114,7 +127,7 @@ export async function testConnection(config: QBittorrentConfig): Promise<string>
  */
 export async function ensureCategory(
   config: QBittorrentConfig,
-  sid: string,
+  cookie: string,
   category: string,
 ): Promise<void> {
   // Try to create — qBit returns 200 even if it already exists
@@ -122,7 +135,7 @@ export async function ensureCategory(
     method: 'POST',
     headers: qbitHeaders(config, {
       'Content-Type': 'application/x-www-form-urlencoded',
-      Cookie: `SID=${sid}`,
+      Cookie: cookie,
     }),
     body: new URLSearchParams({ category, savePath: '' }),
   });
@@ -136,10 +149,10 @@ export async function addMagnet(
   magnetUri: string,
   category?: string,
 ): Promise<void> {
-  const sid = await login(config);
+  const cookie = await login(config);
 
   if (category) {
-    await ensureCategory(config, sid, category);
+    await ensureCategory(config, cookie, category);
   }
 
   const body = new URLSearchParams({ urls: magnetUri });
@@ -151,7 +164,7 @@ export async function addMagnet(
     method: 'POST',
     headers: qbitHeaders(config, {
       'Content-Type': 'application/x-www-form-urlencoded',
-      Cookie: `SID=${sid}`,
+      Cookie: cookie,
     }),
     body,
   });
