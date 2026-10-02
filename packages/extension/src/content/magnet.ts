@@ -1,8 +1,9 @@
+import { extension } from '../browser.js';
 import type { ExtensionResponse, MagnetInfo, MediaType } from '@movie-grabber/shared';
 import { parseMagnetUri } from '@movie-grabber/shared';
 
 /**
- * Magnet content script — injected on-demand via chrome.action.onClicked.
+ * Magnet content script — injected on-demand via extension.action.onClicked.
  * Scans the page for magnet links, parses them, and shows a floating panel.
  */
 
@@ -333,22 +334,11 @@ if (magnets.length === 0) {
       statusEl.style.display = 'none';
 
       try {
-        const response: ExtensionResponse = await new Promise((resolve, reject) => {
-          chrome.runtime.sendMessage(
-            {
-              action: 'addMagnet',
-              magnetUri: magnet.magnetUri,
-              title: magnet.cleanTitle,
-              type: currentType,
-            },
-            (res: ExtensionResponse) => {
-              if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message));
-              } else {
-                resolve(res);
-              }
-            },
-          );
+        const response: ExtensionResponse = await extension.runtime.sendMessage({
+          action: 'addMagnet',
+          magnetUri: magnet.magnetUri,
+          title: magnet.cleanTitle,
+          type: currentType,
         });
 
         // Show detailed status message

@@ -1,3 +1,4 @@
+import { extension } from '../browser.js';
 import type {
   ExtensionMessage,
   ExtensionResponse,
@@ -9,12 +10,12 @@ import type {
 import { DEFAULT_SETTINGS } from '@movie-grabber/shared';
 
 /**
- * Service worker — background script for the Chrome extension.
+ * Background script — runs as a Chrome service worker or Firefox event page.
  * Handles messages from content scripts and communicates with the backend API.
  */
 
 async function getSettings(): Promise<ExtensionSettings> {
-  const result = await chrome.storage.sync.get(DEFAULT_SETTINGS);
+  const result = await extension.storage.sync.get(DEFAULT_SETTINGS);
   return result as ExtensionSettings;
 }
 
@@ -148,11 +149,11 @@ async function addMagnetLink(msg: AddMagnetMessage): Promise<ExtensionResponse> 
 }
 
 // ─── Extension icon click — inject magnet scanner ────────────────────────────
-chrome.action.onClicked.addListener(async (tab) => {
+extension.action.onClicked.addListener(async (tab) => {
   if (!tab.id) return;
 
   try {
-    await chrome.scripting.executeScript({
+    await extension.scripting.executeScript({
       target: { tabId: tab.id },
       files: ['content-magnet.js'],
     });
@@ -162,7 +163,7 @@ chrome.action.onClicked.addListener(async (tab) => {
 });
 
 // ─── Message listener ────────────────────────────────────────────────────────
-chrome.runtime.onMessage.addListener(
+extension.runtime.onMessage.addListener(
   (message: ExtensionMessage, _sender, sendResponse: (r: ExtensionResponse) => void) => {
     const handle = async () => {
       try {
@@ -189,4 +190,4 @@ chrome.runtime.onMessage.addListener(
   },
 );
 
-console.log('[Movie Grabber] Service worker loaded');
+console.log('[Movie Grabber] Background script loaded');

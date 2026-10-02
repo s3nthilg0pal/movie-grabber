@@ -1,3 +1,4 @@
+import { extension } from '../browser.js';
 import type { ExtensionSettings } from '@movie-grabber/shared';
 import { DEFAULT_SETTINGS } from '@movie-grabber/shared';
 
@@ -30,7 +31,7 @@ function showStatus(message: string, isError = false) {
 // ─── Load settings ───────────────────────────────────────────────────────────
 
 async function loadSettings() {
-  const settings = (await chrome.storage.sync.get(DEFAULT_SETTINGS)) as ExtensionSettings;
+  const settings = (await extension.storage.sync.get(DEFAULT_SETTINGS)) as ExtensionSettings;
 
   for (const key of fields) {
     const el = $<HTMLInputElement>(key);
@@ -84,7 +85,7 @@ async function saveSettings() {
   const sonarrFolder = $<HTMLSelectElement>('sonarrRootFolder').value;
   if (sonarrFolder) settings.sonarrRootFolderPath = sonarrFolder;
 
-  await chrome.storage.sync.set(settings);
+  await extension.storage.sync.set(settings);
   showStatus('Settings saved successfully!');
 }
 
@@ -209,7 +210,7 @@ async function testQbit() {
 
 $('save').addEventListener('click', saveSettings);
 $('reset').addEventListener('click', async () => {
-  await chrome.storage.sync.set(DEFAULT_SETTINGS);
+  await extension.storage.sync.set(DEFAULT_SETTINGS);
   await loadSettings();
   showStatus('Settings reset to defaults');
 });

@@ -1,3 +1,4 @@
+import { extension } from '../browser.js';
 import type { MediaInfo, ExtensionMessage, ExtensionResponse } from '@movie-grabber/shared';
 import { injectButton } from '../ui/button.js';
 
@@ -96,7 +97,7 @@ function init() {
     const message: ExtensionMessage = { action: 'addMedia', media };
 
     try {
-      const response: ExtensionResponse = await chrome.runtime.sendMessage(message);
+      const response: ExtensionResponse = await extension.runtime.sendMessage(message);
 
       if (response.alreadyExists) {
         setState('exists', response.message);
@@ -117,7 +118,7 @@ function init() {
     const message: ExtensionMessage = { action: 'checkStatus', media };
 
     try {
-      const response: ExtensionResponse = await chrome.runtime.sendMessage(message);
+      const response: ExtensionResponse = await extension.runtime.sendMessage(message);
 
       if (response.success && response.alreadyExists) {
         setState('exists', response.message);

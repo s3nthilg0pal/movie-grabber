@@ -1,13 +1,13 @@
 # Movie Grabber
 
-A Chrome extension that grabs movie/TV series titles from **IMDb** and **Rotten Tomatoes** and adds them to **Radarr** (movies) or **Sonarr** (TV series). Downloads are handled automatically by Radarr/Sonarr's configured download client (e.g., qBittorrent).
+A Chrome and Firefox extension that grabs movie/TV series titles from **IMDb** and **Rotten Tomatoes** and adds them to **Radarr** (movies) or **Sonarr** (TV series). Downloads are handled automatically by Radarr/Sonarr's configured download client (e.g., qBittorrent).
 
 ## Architecture
 
 ```
 IMDb/RT Page  →  Content Script (extract title/type/ID)
                       ↓ chrome.runtime.sendMessage()
-                 Service Worker
+                 Background Script
                       ↓ fetch()
                  Backend API (Fastify + TypeScript)
                     ├→ Radarr API (movies)  →  [qBittorrent managed internally]
@@ -20,7 +20,7 @@ IMDb/RT Page  →  Content Script (extract title/type/ID)
 packages/
   shared/     — Shared TypeScript types used by both extension and API
   api/        — Fastify backend server (Radarr/Sonarr proxy)
-  extension/  — Chrome Extension (Manifest V3, TypeScript, Vite)
+  extension/  — Chrome/Firefox Extension (Manifest V3, TypeScript, Vite)
 ```
 
 ## Prerequisites
@@ -44,9 +44,14 @@ npm run build:shared
 
 # Build the Chrome extension
 npm run build:extension
+
+# Build the Firefox extension
+npm run build:extension:firefox
 ```
 
 ## Loading the Extension
+
+### Chrome
 
 1. Run `npm run build:extension`
 2. Open Chrome → `chrome://extensions/`
@@ -54,6 +59,21 @@ npm run build:extension
 4. Click "Load unpacked"
 5. Select `packages/extension/dist`
 6. Click the extension icon → Options to configure your backend URL and API keys
+
+### Firefox (desktop 140+)
+
+1. Run `npm run build:extension:firefox`
+2. Open Firefox → `about:debugging#/runtime/this-firefox`
+3. Click **Load Temporary Add-on**
+4. Select `packages/extension/dist-firefox/manifest.json`
+5. Open `about:addons` → **Movie Grabber** → **Preferences** to configure the backend and API keys
+6. Visit an IMDb/Rotten Tomatoes title page to use the floating Add button, or click the toolbar icon on a page with magnet links to open the scanner
+
+Temporary add-ons are removed when Firefox restarts. For permanent installation in standard Firefox, package and sign the Firefox build through [Mozilla Add-ons](https://extensionworkshop.com/documentation/publish/submitting-an-add-on/), then install the signed `.xpi`.
+
+Chrome and Firefox builds use separate output folders and can be built in either order. Firefox uses an event page for the background script and native `browser` APIs. The Firefox manifest includes a stable add-on ID (also needed for sync storage) and declares the credentials and website content sent to your configured backend. Firefox 140+ supports the [built-in consent prompt](https://extensionworkshop.com/documentation/develop/firefox-builtin-data-consent/) for those data types. The extension sends media titles/IDs and magnet links, along with configured service credentials, to the backend to perform requests; it does not send telemetry.
+
+If content buttons or backend requests fail, check the extension's **Permissions** in `about:addons` and allow access to IMDb, Rotten Tomatoes, and your backend host. Reload the page after changing site access.
 
 ## Configuration
 
